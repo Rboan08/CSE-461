@@ -28,17 +28,17 @@ class Firewall(object):
         icmp_rule.match.dl_type = 0x0800  # IPv4
         icmp_rule.match.nw_proto = 1  # ICMP protocol
         icmp_rule.actions.append(of.ofp_action_output(port=of.OFPP_NORMAL))
-        event.connection.send(icmp_rule)
+        connection.send(icmp_rule)
 
         arp_rule = of.ofp_flow_mod()
         arp_rule.match.dl_type = 0x0806  # ARP
         arp_rule.actions.append(of.ofp_action_output(port=of.OFPP_NORMAL))
-        event.connection.send(arp_rule)
+        connection.send(arp_rule)
 
         drop_rule = of.ofp_flow_mod()
         drop_rule.match.dl_type = 0x0800  # IPv4
         drop_rule.actions = []  # No actions → Drop the packet
-        event.connection.send(drop_rule)
+        connection.send(drop_rule)
 
 
     def _handle_PacketIn(self, event):
