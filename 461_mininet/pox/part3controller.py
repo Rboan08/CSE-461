@@ -58,15 +58,21 @@ class Part3Controller(object):
 
     def s1_setup(self):
         # put switch 1 rules here
-        pass
+        arp_rule = of.ofp_flow_mod()
+        arp_rule.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
+        self.connection.send(arp_rule)
 
     def s2_setup(self):
         # put switch 2 rules here
-        pass
+        arp_rule = of.ofp_flow_mod()
+        arp_rule.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
+        self.connection.send(arp_rule)
 
     def s3_setup(self):
         # put switch 3 rules here
-        pass
+        arp_rule = of.ofp_flow_mod()
+        arp_rule.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
+        self.connection.send(arp_rule)
 
     def cores21_setup(self):
         # put core switch rules here
@@ -74,7 +80,9 @@ class Part3Controller(object):
 
     def dcs31_setup(self):
         # put datacenter switch rules here
-        pass
+        arp_rule = of.ofp_flow_mod()
+        arp_rule.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
+        self.connection.send(arp_rule)
 
     # used in part 4 to handle individual ARP packets
     # not needed for part 3 (USE RULES!)
