@@ -76,7 +76,32 @@ class Part3Controller(object):
 
     def cores21_setup(self):
         # put core switch rules here
-        pass
+
+        # Drops all the icmp packets from hnotrust
+        hnotrust_drop_rule = of.ofp_flow_mod()
+        hnotrust_drop_rule.match.dl_type = 0x0800
+        hnotrust_drop_rule.match.nw_proto = 1
+        hnotrust_drop_rule.match.nw_src = IPS["hnotrust"]
+        hnotrust_drop_rule.actions = []
+        self.connection.send(hnotrust_drop_rule)
+
+        # Drops all IP packets from hnotrust to serv1
+        serv1_drop_rule = of.ofp_flow_mod()
+        serv1_drop_rule.match.dl_type = 0x0800
+        serv1_drop_rule.match.nw_src = IPS["hnotrust"]
+        serv1_drop_rule.match.nw_dst = IPS["serv1"]
+        serv1_drop_rule.actions = []
+        self.connection.send(serv1_drop_rule)
+        port_num = 1
+
+        # Forwards other packets to their specific ports
+        for host_name, host_address in IPS.items():
+            forward_rule = of.ofp_flow_mod()
+            forward_rule.match.dl_type = 0x0800
+            forward_rule.match.nw_dst = host_address
+            forward_rule.actions.append(of.ofp_action_output(port=port_num))
+            self.connection.send(forward_rule)
+            port_num += 1
 
     def dcs31_setup(self):
         # put datacenter switch rules here
