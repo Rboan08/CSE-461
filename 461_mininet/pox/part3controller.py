@@ -59,18 +59,21 @@ class Part3Controller(object):
     def s1_setup(self):
         # put switch 1 rules here
         arp_rule = of.ofp_flow_mod()
+        arp_rule.match.in_port = 1
         arp_rule.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
         self.connection.send(arp_rule)
 
     def s2_setup(self):
         # put switch 2 rules here
         arp_rule = of.ofp_flow_mod()
+        arp_rule.match.in_port = 2
         arp_rule.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
         self.connection.send(arp_rule)
 
     def s3_setup(self):
         # put switch 3 rules here
         arp_rule = of.ofp_flow_mod()
+        arp_rule.match.in_port = 3
         arp_rule.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
         self.connection.send(arp_rule)
 
@@ -106,6 +109,7 @@ class Part3Controller(object):
     def dcs31_setup(self):
         # put datacenter switch rules here
         arp_rule = of.ofp_flow_mod()
+        arp_rule.match.in_port = 4
         arp_rule.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
         self.connection.send(arp_rule)
 
