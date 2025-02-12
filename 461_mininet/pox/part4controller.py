@@ -6,6 +6,7 @@
 from pox.core import core
 import pox.openflow.libopenflow_01 as of
 from pox.lib.addresses import IPAddr, IPAddr6, EthAddr
+from pox.lib.packet import arp, ethernet
 
 log = core.getLogger()
 
@@ -27,6 +28,8 @@ SUBNETS = {
     "hnotrust": "172.16.10.0/24",
 }
 
+GATEWAY_IPS = {"10.0.1.1", "10.0.2.1", "10.0.3.1", "10.0.4.1"}
+
 
 class Part4Controller(object):
     """
@@ -38,6 +41,9 @@ class Part4Controller(object):
         # Keep track of the connection to the switch so that we can
         # send it messages!
         self.connection = connection
+
+        # create ARP table to map IPs to MAC addresses and port
+        self.arp_table = {}
 
         # This binds our PacketIn event listener
         connection.addListeners(self)
@@ -93,17 +99,6 @@ class Part4Controller(object):
         serv1_drop_rule.match.nw_dst = IPS["serv1"]
         serv1_drop_rule.actions = []
         self.connection.send(serv1_drop_rule)
-        port_num = 1
-
-        # Forwards other packets to their specific ports
-        for host_name, host_address in IPS.items():
-            forward_rule = of.ofp_flow_mod()
-            forward_rule.priority = 10
-            forward_rule.match.dl_type = 0x0800
-            forward_rule.match.nw_dst = host_address
-            forward_rule.actions.append(of.ofp_action_output(port=port_num))
-            self.connection.send(forward_rule)
-            port_num += 1
 
     def dcs31_setup(self):
         # put datacenter switch rules here
@@ -121,6 +116,61 @@ class Part4Controller(object):
         msg.actions.append(action)
         self.connection.send(msg)
 
+    def handle_arp(self, packet, event):
+        # obtain ARP packet
+        arp_packet = packet.payload
+
+        # check if the packet is an ARP request, and we have a record
+        if arp_packet.opcode == arp.REQUEST :
+            self.learn_packet(packet, event)
+            self.send_arp_reply(packet, event)
+
+    def learn_packet(self, packet, event) :
+        arp_payload = packet.payload
+        ip = arp_payload.protosrc
+        mac = arp_payload.hwsrc
+        port = event.port
+        self.arp_table[ip] = (mac, port)
+
+    def send_arp_reply(self, packet, event) :
+        arp_packet = packet.payload
+        reply_arp = arp()
+        reply_arp.opcode = arp.REPLY
+        reply_arp.hwsrc = arp_packet.hwdst
+        reply_arp.hwdst = arp_packet.hwsrc
+        reply_arp.protosrc = arp_packet.protodst
+        reply_arp.protodst = arp_packet.protosrc
+
+        reply_eth = ethernet()
+        reply_eth.type = ethernet.ARP_TYPE
+        reply_eth.dst = packet.src
+        reply_eth.src = reply_arp.hwdst
+        reply_eth.payload = reply_arp
+
+        self.resend_packet(reply_eth, event.port)
+
+    def forward_ip(self, packet, event) :
+        # method to forward IP packets using the ARP table records
+
+        ip_packet = packet.payload
+
+        ip_src = ip_packet.srcip
+        ip_dst = ip_packet.dstip
+
+        if ip_dst in self.arp_table:
+            mac, port = self.arp_table[ip_dst]
+            print(f"Record for ip {ip_dst} found. mac {mac} port {port}")
+            forward_rule = of.ofp_flow_mod()
+            forward_rule.match.nw_dst = ip_dst
+            forward_rule.actions.append(of.ofp_action_dl_addr.set_src(self.connection.eth_addr))
+            forward_rule.actions.append(of.ofp_action_dl_addr.set_dst(mac))
+            forward_rule.actions.append(of.ofp_action_output(port=port))
+            self.connection.send(forward_rule)
+        else :
+            print(f"No entry in ARP records for {ip_dst}")
+            print(f"Current state of arp_table: {self.arp_table}")
+
+
     def _handle_PacketIn(self, event):
         """
         Packets not handled by the router rules will be
@@ -133,9 +183,16 @@ class Part4Controller(object):
             return
 
         packet_in = event.ofp  # The actual ofp_packet_in message.
-        print(
-            "Unhandled packet from " + str(self.connection.dpid) + ":" + packet.dump()
-        )
+
+        # check what the packet type is, and handle separately
+        if packet.type == packet.ARP_TYPE :
+            self.handle_arp(packet, event)
+        elif packet.type == packet.IP_TYPE :
+            self.forward_ip(packet, event)
+        else:
+            print(
+                "Unhandled packet from " + str(self.connection.dpid) + ":" + packet.dump()
+            )
 
 
 def launch():
