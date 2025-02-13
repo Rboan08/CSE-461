@@ -28,9 +28,6 @@ SUBNETS = {
     "hnotrust": "172.16.10.0/24",
 }
 
-GATEWAY_IPS = {"10.0.1.1", "10.0.2.1", "10.0.3.1", "10.0.4.1"}
-
-
 class Part4Controller(object):
     """
     A Connection object for that switch is passed to the __init__ function.
@@ -127,45 +124,63 @@ class Part4Controller(object):
 
     def learn_packet(self, packet, event) :
         arp_payload = packet.payload
-        ip = arp_payload.protosrc
-        mac = arp_payload.hwsrc
+        ip = str(arp_payload.protosrc)
+        mac = str(arp_payload.hwsrc)
         port = event.port
         self.arp_table[ip] = (mac, port)
+        print(f"Learning address for ip {ip}: mac : {mac} port : {port}")
 
     def send_arp_reply(self, packet, event) :
         arp_packet = packet.payload
         reply_arp = arp()
         reply_arp.opcode = arp.REPLY
-        reply_arp.hwsrc = arp_packet.hwdst
+        reply_arp.hwsrc = self.connection.eth_addr
         reply_arp.hwdst = arp_packet.hwsrc
         reply_arp.protosrc = arp_packet.protodst
         reply_arp.protodst = arp_packet.protosrc
 
         reply_eth = ethernet()
         reply_eth.type = ethernet.ARP_TYPE
-        reply_eth.dst = packet.src
-        reply_eth.src = reply_arp.hwdst
+        reply_eth.dst = reply_arp.hwdst
+        reply_eth.src = reply_arp.hwsrc
         reply_eth.payload = reply_arp
 
-        self.resend_packet(reply_eth, event.port)
+        self.resend_packet(reply_eth.pack(), event.port)
 
     def forward_ip(self, packet, event) :
         # method to forward IP packets using the ARP table records
 
         ip_packet = packet.payload
 
-        ip_src = ip_packet.srcip
-        ip_dst = ip_packet.dstip
+        ip_src = str(ip_packet.srcip)
+        ip_dst = str(ip_packet.dstip)
+
+        print(f"Checking if ip_dst {ip_dst} is in arp_table: {self.arp_table}")
 
         if ip_dst in self.arp_table:
             mac, port = self.arp_table[ip_dst]
             print(f"Record for ip {ip_dst} found. mac {mac} port {port}")
             forward_rule = of.ofp_flow_mod()
-            forward_rule.match.nw_dst = ip_dst
+            forward_rule.match.dl_type = 0x8000
+            forward_rule.match.nw_dst = IPAddr(ip_dst)
             forward_rule.actions.append(of.ofp_action_dl_addr.set_src(self.connection.eth_addr))
-            forward_rule.actions.append(of.ofp_action_dl_addr.set_dst(mac))
+            forward_rule.actions.append(of.ofp_action_dl_addr.set_dst(EthAddr(mac.encode())))
             forward_rule.actions.append(of.ofp_action_output(port=port))
+            forward_rule.priority = 10
             self.connection.send(forward_rule)
+
+            
+            ethernet_record = packet.find('ethernet')
+            if ethernet_record :
+                ethernet_record.src = self.connection.eth_addr
+
+                mac_addr = self.arp_table.get(ip_dst)
+
+            if mac_addr :
+                ethernet_record.dst = EthAddr(mac_addr[0].encode())
+            else :
+                return
+            self.resend_packet(packet, port)
         else :
             print(f"No entry in ARP records for {ip_dst}")
             print(f"Current state of arp_table: {self.arp_table}")
