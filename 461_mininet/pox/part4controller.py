@@ -123,6 +123,7 @@ class Part4Controller(object):
             self.send_arp_reply(packet, event)
 
     def learn_packet(self, packet, event) :
+        # takes in ARP packet and maps IP to MAC, Port tuple
         arp_payload = packet.payload
         ip = str(arp_payload.protosrc)
         mac = str(arp_payload.hwsrc)
@@ -131,6 +132,7 @@ class Part4Controller(object):
         print(f"Learning address for ip {ip}: mac : {mac} port : {port}")
 
     def send_arp_reply(self, packet, event) :
+        # proxy the ARP replies
         arp_packet = packet.payload
         reply_arp = arp()
         reply_arp.opcode = arp.REPLY
@@ -174,13 +176,9 @@ class Part4Controller(object):
             if ethernet_record :
                 ethernet_record.src = self.connection.eth_addr
 
-                mac_addr = self.arp_table.get(ip_dst)
-
-            if mac_addr :
-                ethernet_record.dst = EthAddr(mac_addr[0].encode())
-            else :
-                return
-            self.resend_packet(packet, port)
+            if mac :
+                ethernet_record.dst = EthAddr(mac.encode())
+                self.resend_packet(packet, port)
         else :
             print(f"No entry in ARP records for {ip_dst}")
             print(f"Current state of arp_table: {self.arp_table}")
