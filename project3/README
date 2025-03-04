@@ -1,24 +1,66 @@
-Name:
-UWNetID:
+Name: Gerardo Salgado
+UWNetID: gersaldo
 
-Name:
-UWNetID:
+Name: Anand Gupta
+UWNetID: agupta04
 
-Name:
-UWNetID:
+Name: Richie Doan
+UWNetID: rdoan08
 
 Instructions to reproduce the results:
-  TODO
+  For TCP-Reno: sudo ./run.sh
+  For TCP-BBR: sudo ./run_bbr.sh
 
 Answers to the questions:
 Part 2
-  1. TODO
-  2. TODO
-  3. TODO
-  4. TODO
-  5. TODO
+  1.
+
+  q=20
+  Average fetch time: 0.22886960606060605 seconds
+  Standard deviation: 0.04260237285493863 seconds
+  q=100
+  Average fetch time: 0.8867563703703704 seconds
+  Standard deviation: 0.24638211341581223 seconds
+
+  2. 
+
+  With a small buffer, packets may get dropped more frequently but they spend less time in the queue before being transmitted.
+  With a larger buffer, more packets can be stored before being dropped but because packets spend more time in the buffer before being transmitted, this results in a longer fetch time.
+
+  3.
+
+  The maximum transmit queue length reported by ifconfig is 1000 packets (txqueuelen). Packet size is 1500 bytes (mtu reported by ifconfig) which is 12,000 bits. Assuming the queue drains at 100Mb/s, the maximum time a packet might wait in the queue is (12,000 bits / 100Mb/s) * 1000 packets in a queue = 120 milliseconds.
+  
+  4.
+
+  The average RTT reported by ping when q=20 was 9 seconds while the average RTT reported when q=100 was 11 seconds. This can be explained by the fact that the buffer size being smaller means there is less time for packets to be stored in the queue before being transmitted.
+
+  5.
+
+  Active Queue Management (AQM): Techniques like FQ_CODEL mitigates bufferbloat by redistributing the flow of packets fairly across each flow. It will also drop packets from buffers that are experiencing excessive delay thus minimizing latency.
+
+  Bottleneck Bandwidth and RTT (BBR): This algorithm mitigates bufferbloat by periodically probing the network for estimates of available bandwidth and RTT. Given these estimates, it will adjust the congestion control window rather than waiting on packet loss as a signal for congestion.
+
+  
 Part 3
-  1. TODO
+  1.
+  q=20
+  Average fetch time: 0.15718857575757575 seconds
+  Standard deviation: 0.03237914934609762 seconds
+  q=100
+  Average fetch time: 0.15699560606060606 seconds
+  Standard deviation: 0.029791361130304405 seconds
+
   2. TODO
+  
+Our recordings show a lower fetch time for q=100 (even though a very small difference). This is different from Part 2, where the average fetch time is much more for q=100. Another significant difference is that in Part 2, the queue average fetch times have a greater difference, compared to in Part 3, where the queue average fetch time for the different queue sizes are almost the same.
   3. TODO
+
+We can see that in the Part 2 queue size graphs, the buffer fills up all the way before decreasing, so the queue size of 20 will sometimes reach full capacity before emptying packets. The same happens with the queue size of 100 where 100 packets will fill the buffer before emptying.
+
+This is different in Part 3, where packets for either queue size of 20 or 100, will reach a max of around 13 packets, and will keep a constant amount of around 10 packets throughout the whole run.
+
+These graphs show us the difference between the RENO and BBR protocols, where RENO will wait until the queue has reached capacity to start “draining” packets, and BBR will release packets even if the queue has not reached capacity. This is part of the BBR protocol, which attempts to fix bufferbloat.
   4. TODO
+
+As previously mentioned in Q4, and in lecture, the application of BBR does attempt to solve the bufferbloat problem, and has worked significantly in our application as we see that our average fetch time has reduced, especially for when our queue size is 100. The protocol of BBR and the 4 Phases (Startup, Drain, Probe Bandwidth, and Probe RTT), helps the packet transfer to be consistent in how many packets are in our queue, and thus, make our fetch time stay consistent and low as well. We can also see this in comparing our graphs for the number of packets in our buffers, and especially in our RTT graphs where our queue of size 100 faces an increase in delay in Part 2 (RENO), but remains consistent in Part 3 (BBR). 
